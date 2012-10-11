@@ -41,24 +41,56 @@
 (defcustom qiita-password nil
   "Password for qiita")
 
-(defun qiita-get-json (uri &rest args)
-  ;; (with-temp-buffer
-  (with-current-buffer (get-buffer-create "*qiita*")
-    (erase-buffer)
-    (apply 'call-process "curl" nil (current-buffer) nil uri "-s" args)
-    (beginning-of-buffer)
-    (prog1 (json-read)
-      )
-    ;; (buffer-string)
+(defvar qiita-token nil)
+
+(defconst qiita-base-url "https://qiita.com/api/v1")
+
+(defun qiita-retrieve-json (api)
+  (with-current-buffer
+      (url-retrieve-synchronously
+       (concat qiita-base-url api))
+    (goto-char (point-min))
+    ;; furl--get-response-body
+    (search-forward "\n\n" nil t)
+    (narrow-to-region (point) (point-max))
+    (json-read)
+    ))
+
+(defun qiita-api-rate-limit ()
+  (let ((url-request-method "GET")
+        (url-request-extra-headers
+         `(("Accept" . "application/json"))))
+    (qiita-retrieve-json "/rate_limit")
+    ))
+
+(defun qiita-api-auth ()
+  (let ((url-request-method "POST")
+        (url-request-extra-headers
+         `(("Content-Type" . "application/x-www-form-urlencoded")
+           ("Accept" . "application/json")))
+        (url-request-data (format "url_name=%s&password=%s"
+                                  qiita-user qiita-password)))
+    (qiita-retrieve-json "/auth")
     ))
 
 (defun qiita-get-token ()
-  (qiita-get-json "https://qiita.com/api/v1/auth"
-                  "-d" (format "url_name=%s" qiita-user)
-                  "-d" (format "password=%s" qiita-password))
-  )
-;; (qiita-get-json "https://qiita.com/api/v1/rate_limit")
-;; (qiita-get-token)
+  (assoc-default 'token
+                 (qiita-api-auth)))
+
+(defun qiita-api-post-items (json-param)
+  (let ((url-request-method "POST")
+        (url-request-extra-headers
+         `(("Content-Type" . "application/json")
+           ("Accept" . "application/json")))
+        (url-request-data json-param))
+    (unless qiita-token
+      (setq qiita-token (qiita-get-token)))
+    (qiita-retrieve-json
+     (format "/items?token=%s" qiita-token))
+    ))
+
+;; (qiita-api-post-items
+;;  (json-encode '((tweet . :json-false) (gist . t) (private . t) (tags . [((versions . [1.2 1.3]) (name . "FOOBAR"))]) (body . "foooooooooooooooo") (title . "にほんご"))))
 
 (provide 'qiita)
 
