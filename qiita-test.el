@@ -19,5 +19,6 @@
 ;; (qiita-api-get-tags)
 ;; (qiita-api-auth)
 ;; (qiita-get-token)
-;; (qiita-api-post-items
-;;  (json-encode '((tweet . :json-false) (gist . t) (private . t) (tags . [((versions . [1.2 1.3]) (name . "FOOBAR"))]) (body . "foooooooooooooooo") (title . "にほんご"))))
+;; (assoc-default 'uuid
+;;                (qiita-api-post-items
+;;                 (json-encode '((tweet . :json-false) (gist . t) (private . t) (tags . [((versions . [1.2 1.3]) (name . "FOOBAR"))]) (body . "foooooooooooooooo") (title . "にほんご")))))

@@ -153,7 +153,7 @@
     (qiita-retrieve-json
      (concat "/items"
              "/" uuid
-             "?token=" qiita-token))))
+             "?token=" qiita-token) t)))
 
 (defun qiita-api-delete-items (uuid)
   (let ((url-request-method "DELETE")
@@ -270,5 +270,50 @@
                               ,(when stocked-p `("stocked" . ,stocked-p)))
                             )))
 (qiita-define-shorten-name 'qiita-api-get-search)
+
+(defvar qiita-enable-tweet nil)
+(make-variable-buffer-local 'qiita-enable-tweet)
+
+(defvar qiita-enable-gist nil)
+(make-variable-buffer-local 'qiita-enable-gist)
+
+(defvar qiita-enable-private nil)
+(make-variable-buffer-local 'qiita-enable-private)
+
+(defvar qiita-file-uuid nil)
+(make-variable-buffer-local 'qiita-file-uuid)
+
+(defun qiita-post-buffer ()
+  (interactive)
+  (let ((params))
+    (save-excursion
+      (goto-char (point-min))
+      (add-to-list
+       'params
+       `(title . ,(car (split-string (buffer-substring-no-properties
+                                      (point-min) (point-at-eol)) "#"))))
+      (add-to-list
+       'params
+       `(tags . ,(vconcat
+                  (loop
+                   with ret
+                   while (re-search-forward " #\\(\\S-*\\)"
+                                            (point-at-eol) t)
+                   do (push `((name . ,(match-string-no-properties 1))) ret)
+                   finally (return (or ret (error "no tags")))
+                   ))))
+      (end-of-line)
+      (add-to-list
+       'params
+       `(body . ,(buffer-substring-no-properties (1+ (point)) (point-max))))
+      (add-to-list 'params `(private . ,(or qiita-enable-private :json-false)))
+      (add-to-list 'params `(tweet . ,(or qiita-enable-tweet :json-false)))
+      (add-to-list 'params `(gist . ,(or qiita-enable-gist :json-false)))
+      )
+    (if qiita-file-uuid
+        (qiita-api-put-items qiita-file-uuid (json-encode params))
+      (setq qiita-file-uuid
+            (assoc-default
+             'uuid (qiita-api-post-items (json-encode params)))))))
 
 (provide 'qiita)
