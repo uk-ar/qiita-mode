@@ -34,6 +34,7 @@
 
 ;;; Commentary:
 (require 'json)
+(require 'url)
 
 (defcustom qiita-user nil
   "User name for qiita")
@@ -45,25 +46,65 @@
 
 (defconst qiita-base-url "https://qiita.com/api/v1")
 
-(defun qiita-retrieve-json (api)
+(defcustom qiita-connection-type 'emacs
+  "emacs curl")
+
+(defun qiita-curl-retrieve-synchronously (url)
+  (with-current-buffer (get-buffer-create "*qiita*")
+    (erase-buffer)
+    (let ((args))
+      (if url-request-method
+          (setq args (append args `("-X" ,url-request-method))))
+      (if url-request-extra-headers
+          (setq args
+                (apply 'append args
+                       (mapcar
+                        (lambda (elem)
+                          (list "-H"
+                                (format "%s: %s" (car elem) (cdr elem))))
+                        url-request-extra-headers))))
+      (if url-request-data
+          (setq args (append args `("-d" ,url-request-data))))
+      (apply 'call-process "curl" nil (current-buffer) nil url
+             "--trace-ascii" "log";for debug
+             "-s" args)
+      ;; for debug
+      ;;(apply 'call-process "echo" nil (current-buffer) nil url "-s" args)
+      )
+    (goto-char (point-min))
+    (buffer-string)
+    ))
+
+(defun qiita-url-retrieve-synchronously (url)
   (with-current-buffer
-      (url-retrieve-synchronously
-       (concat qiita-base-url api))
+      (url-retrieve-synchronously url)
     (goto-char (point-min))
     ;; furl--get-response-body
     (search-forward "\n\n" nil t)
     (narrow-to-region (point) (point-max))
-    (json-read)
+    ;; for debug
+    (print (buffer-string))
+    (buffer-string)
     ))
 
-(defun qiita-api-rate-limit ()
-  (let ((url-request-method "GET")
-        (url-request-extra-headers
-         `(("Accept" . "application/json"))))
-    (qiita-retrieve-json "/rate_limit")
+(defun qiita-retrieve-json (api &optional no-read-p)
+  (let ((url (concat qiita-base-url api)))
+    (funcall (if no-read-p 'identity 'json-read-from-string)
+     (cond
+      ((eq qiita-connection-type 'emacs)
+       (qiita-url-retrieve-synchronously url))
+      ((eq qiita-connection-type 'curl)
+       (qiita-curl-retrieve-synchronously url))
+      (t (error "qiita-connection-type"))))
     ))
 
-(defun qiita-api-auth ()
+(defun qiita-define-shorten-name (symbol)
+  (defalias
+    (intern
+     (replace-regexp-in-string "-post\\|-get" "" (symbol-name symbol)))
+    symbol))
+
+(defun qiita-api-post-auth ()
   (let ((url-request-method "POST")
         (url-request-extra-headers
          `(("Content-Type" . "application/x-www-form-urlencoded")
@@ -72,10 +113,21 @@
                                   qiita-user qiita-password)))
     (qiita-retrieve-json "/auth")
     ))
+(qiita-define-shorten-name 'qiita-api-post-auth)
 
 (defun qiita-get-token ()
   (assoc-default 'token
                  (qiita-api-auth)))
+
+(defun qiita-api-get-items (&optional uuid token)
+  (qiita-get-method (concat "/items" (when uuid (concat "/" uuid)))
+                    (when token `(("token" . ,token)))))
+
+(defun qiita-get-item (uuid &optional token)
+  (qiita-api-get-items uuid token))
+
+(defun qiita-get-items (&optional token)
+  (qiita-api-get-items nil token))
 
 (defun qiita-api-post-items (json-param)
   (let ((url-request-method "POST")
@@ -89,8 +141,134 @@
      (format "/items?token=%s" qiita-token))
     ))
 
-;; (qiita-api-post-items
-;;  (json-encode '((tweet . :json-false) (gist . t) (private . t) (tags . [((versions . [1.2 1.3]) (name . "FOOBAR"))]) (body . "foooooooooooooooo") (title . "にほんご"))))
+;; input type json?
+(defun qiita-api-put-items (uuid json-param)
+  (let ((url-request-method "PUT")
+        (url-request-extra-headers
+         `(("Content-Type" . "application/json")
+           ("Accept" . "application/json")))
+        (url-request-data json-param))
+    (unless qiita-token
+      (setq qiita-token (qiita-get-token)))
+    (qiita-retrieve-json
+     (concat "/items"
+             "/" uuid
+             "?token=" qiita-token))))
+
+(defun qiita-api-delete-items (uuid)
+  (let ((url-request-method "DELETE")
+        (url-request-extra-headers
+         `(("Content-Type" . "application/json")
+           ("Accept" . "application/json")))
+        )
+    (unless qiita-token
+      (setq qiita-token (qiita-get-token)))
+    (qiita-retrieve-json
+     (concat "/items"
+             "/" uuid
+             "?token=" qiita-token) t)))
+
+(defun qiita-api-get-stocks ()
+  (unless qiita-token
+    (setq qiita-token (qiita-get-token)))
+  (qiita-get-method "/stocks" `(("token" . ,qiita-token))))
+
+;; is this restfull?
+(defun qiita-api-put-items-stock (uuid)
+  (let ((url-request-method "PUT")
+        (url-request-extra-headers
+         `(("Accept" . "application/json")
+           ("Content-length" . "0"))))
+    (unless qiita-token
+      (setq qiita-token (qiita-get-token)))
+    (qiita-retrieve-json
+     (concat "/items"
+             "/" uuid
+             "/stock"
+             "?token=" qiita-token)
+     t)))
+
+;; Cannot work?
+(defun qiita-api-delete-items-unstock (uuid)
+  (let ((url-request-method "DELETE")
+        (url-request-extra-headers
+         `(("Accept" . "application/json"))))
+    (unless qiita-token
+      (setq qiita-token (qiita-get-token)))
+    (qiita-retrieve-json
+     (concat "/items"
+             "/" uuid
+             "/unstock"
+             "?token=" qiita-token)
+     t)))
+
+(defcustom qiita-api-per-page 20
+  "items per page")
+
+(defcustom qiita-api-page 0
+  "page")
+
+(defun qiita-get-method (route &optional params)
+  (let ((url-request-method "GET")
+        (url-request-extra-headers
+         `(("Accept" . "application/json")))
+        (url-request-data nil))
+    (unless (eq qiita-api-per-page 20)
+      (add-to-list 'params
+                   `("per_page" . ,qiita-per-page)))
+    (qiita-retrieve-json
+     (concat route
+             (when params
+               (concat "?" (mapconcat
+                            (lambda (param)
+                              (concat (url-hexify-string (car param))
+                                      "="
+                                      (url-hexify-string (cdr param))))
+                            params
+                            "&")))))))
+
+(defun qiita-api-page-token-params (page token)
+  (list
+   `("page" . ,(number-to-string (or page qiita-api-page)))
+   (when token  `("token" . ,token))))
+
+(defun qiita-api-get-rate-limit (&optional token)
+  (qiita-get-method "/rate_limit" (when token `(("token" . ,token)))))
+(qiita-define-shorten-name 'qiita-api-get-rate-limit)
+
+(defun qiita-api-get-user-items (user &optional page token)
+  (qiita-get-method (concat "/users"
+                            "/" user
+                            "/items")
+                    (qiita-api-page-token-params page token)))
+(qiita-define-shorten-name 'qiita-api-get-user-items)
+
+(defun qiita-api-get-user-stocks (user &optional page token)
+  (qiita-get-method (concat "/users"
+                            "/" user
+                            "/stocks")
+                    (qiita-api-page-token-params page token)))
+(qiita-define-shorten-name 'qiita-api-get-user-stocks)
+
+;; todo report user as tag
+(defun qiita-api-get-tags-items (tags &optional page token)
+  (qiita-get-method (concat "/tags"
+                            "/" tags
+                            "/items")
+                    (qiita-api-page-token-params page token)))
+(qiita-define-shorten-name 'qiita-api-get-tags-items)
+
+(defun qiita-api-get-tags (&optional page token)
+  (qiita-get-method (concat "/tags")
+                    (qiita-api-page-token-params page token)))
+(qiita-define-shorten-name 'qiita-api-get-tags)
+
+(defun qiita-api-get-search (query &optional stocked-p page token)
+  (qiita-get-method (concat "/search")
+                    (append (qiita-api-page-token-params page token)
+                            `(("q" . ,query)
+                              ,(when stocked-p `("stocked" . ,stocked-p)))
+                            )))
+(qiita-define-shorten-name 'qiita-api-get-search)
 
 (provide 'qiita)
-
