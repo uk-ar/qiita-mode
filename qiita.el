@@ -324,6 +324,19 @@
         (qiita-api-put-items qiita-file-uuid (json-encode params))
       (setq qiita-file-uuid
             (assoc-default
-             'uuid (qiita-api-post-items (json-encode params)))))))
+             'uuid (qiita-api-post-items (json-encode params))))
+      ;; insert
+      (save-excursion
+        (goto-char (point-max))
+        (insert (format  "\
+
+<!--
+Local Variables:
+qiita-file-uuid: %S
+End:
+-->
+" qiita-file-uuid))
+        )
+      )))
 
 (provide 'qiita)
