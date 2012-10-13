@@ -65,9 +65,12 @@
                         url-request-extra-headers))))
       (if url-request-data
           (setq args (append args `("-d" ,url-request-data))))
-      (apply 'call-process "curl" nil (current-buffer) nil url
-             "--trace-ascii" "log";for debug
-             "-s" args)
+      (unless
+          (zerop (apply 'call-process "curl" nil (current-buffer) nil url
+                        "--trace-ascii" "log";for debug
+                        "-s" args))
+        (error "connection error at curl")
+        )
       ;; for debug
       ;;(apply 'call-process "echo" nil (current-buffer) nil url "-s" args)
       )
@@ -88,15 +91,22 @@
     ))
 
 (defun qiita-retrieve-json (api &optional no-read-p)
-  (let ((url (concat qiita-base-url api)))
-    (funcall (if no-read-p 'identity 'json-read-from-string)
-     (cond
-      ((eq qiita-connection-type 'emacs)
-       (qiita-url-retrieve-synchronously url))
-      ((eq qiita-connection-type 'curl)
-       (qiita-curl-retrieve-synchronously url))
-      (t (error "qiita-connection-type"))))
-    ))
+  (let ((url (concat qiita-base-url api))
+        (string))
+    (setq string
+          (cond
+           ((eq qiita-connection-type 'emacs)
+            (qiita-url-retrieve-synchronously url))
+           ((eq qiita-connection-type 'curl)
+            (qiita-curl-retrieve-synchronously url))
+           (t (error "qiita-connection-type"))))
+    (let ((ret-json
+           (funcall (if no-read-p 'identity 'json-read-from-string) string)))
+      (message "OK")
+      (when (assoc-default 'error ret-json)
+        (error "Qiita returns error %S" (assoc-default 'error ret-json)))
+      ret-json
+      )))
 
 (defun qiita-define-shorten-name (symbol)
   (defalias
