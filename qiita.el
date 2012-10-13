@@ -339,4 +339,123 @@ End:
         )
       )))
 
+(defun qiita-browse-url (&optional uuid)
+  (interactive)
+  (setq  uuid (or uuid qiita-file-uuid))
+  (unless uuid (error "uuid is empty"))
+  (browse-url (concat "https://qiita.com/items/" uuid)))
+
+(defun qiita-tags-items (tags)
+  (mapcar (lambda (item)
+            (message "uuid:%s" (assoc-default 'uuid item))
+            (message "title:%s" (assoc-default 'uuid item))
+            )
+          (append (qiita-api-get-tags-items tags) nil))
+  )
+
+(defun qiita-parse-tags (json-params)
+  (mapconcat (lambda (tag)
+               ;; (message "uuid:%s" (assoc-default 'uuid item))
+               ;; (message "title:%s" (assoc-default 'title item))
+               (concat
+                "#" (url-unhex-string (assoc-default 'url_name tag))
+                ;; (assoc-default 'url_name item) " "
+                ;; (assoc-default 'title item) "\n"
+                ;; (format "%S" (assoc-default 'tags item))))
+                ))
+             (append json-params nil) ;; (qiita-get-items qiita-token)
+             " "
+             ))
+
+;; (qiita-tags-items "api")
+(defun qiita-my-items ()
+  (unless qiita-token
+    (setq qiita-token (qiita-get-token)))
+  (mapcar (lambda (item)
+            ;; (message "uuid:%s" (assoc-default 'uuid item))
+            ;; (message "title:%s" (assoc-default 'title item))
+            (cons (concat
+                   (assoc-default 'url_name item) " "
+                   (assoc-default 'title item)
+                   (qiita-parse-tags (assoc-default 'tags item))
+                   "\n"
+                   (let* ((string (assoc-default 'body item))
+                          (strings (split-string string "\n")))
+                     ;; (when (< (window-width) (length string))
+                     ;;   (setq string (substring string 0 (window-width))))
+                     (if (< 2 (length strings))
+                         (setq string (concat
+                                       (nth 0 strings) "\n" (nth 0 strings)))
+                         )
+                     (replace-regexp-in-string "<.*?>" "" string)
+                     ;; string
+                     ;; string
+                     )
+                   ;; (substring "hogehogehogehgoe" 0 100)
+                   ;; (message )
+                   ;; (substring 0 (assoc-default 'body item) 10)
+                   ;; (substring  0 (window-width) (assoc-default 'body item))
+                   ;; (format "%s" (assoc-default 'user))
+                   ;; (format "%S" (assoc-default 'tags item))
+                   )
+                  (assoc-default 'uuid item))
+            )
+          (append test-data nil) ;; (qiita-get-items qiita-token)
+          ))
+(require 'markdown-mode)
+;; (markdown-mode)
+
+;; (qiita-parse-tags [((versions . []) (following . :json-false) (follower_count . 1) (item_count . 13) (icon_url . "http://qiita.com/icons/thumb/missing.png") (url_name . "api") (name . "api"))])
+
+(defvar anything-c-source-qiita
+  '((name . "qiita")
+    (candidates . (lambda () (qiita-my-items)))
+    (action . qiita-browse-url)
+    (multiline)
+    ))
+
+(defun qiita-anyhing ()
+  (interactive)
+  (anything-other-buffer
+   '(anything-c-source-qiita)
+   "*qiita-anything*"))
+
+;; (qiita-my-items)
+(setq test-data
+[((stocked . :json-false) (created_at_as_seconds . 1350099389) (private . :json-false) (gist_url) (url . "http://qiita.com/items/bb2462c263e2e9f95de6") (comment_count . 0) (stock_users . []) (stock_count . 0) (tags . [((versions . []) (following . :json-false) (follower_count . 1) (item_count . 13) (icon_url . "http://qiita.com/icons/thumb/missing.png") (url_name . "api") (name . "api"))]) (updated_at_in_words . "1時間前") (created_at_in_words . "1時間前") (updated_at . "2012-10-13 12:36:29 +0900") (created_at . "2012-10-13 12:36:29 +0900") (body . "<p>も一度新規</p>
+") (title . "title2 ") (user (following . :json-false) (profile_image_url . "https://si0.twimg.com/profile_images/1681702121/icon_048_normal.png") (url_name . "uk_ar") (name . "uk")) (uuid . "bb2462c263e2e9f95de6") (id . 9883)) ((stocked . :json-false) (created_at_as_seconds . 1350099265) (private . :json-false) (gist_url) (url . "http://qiita.com/items/25d36a4025c44cece36f") (comment_count . 0) (stock_users . []) (stock_count . 0) (tags . [((versions . []) (following . :json-false) (follower_count . 1) (item_count . 13) (icon_url . "http://qiita.com/icons/thumb/missing.png") (url_name . "api") (name . "api"))]) (updated_at_in_words . "1時間前") (created_at_in_words . "2時間前") (updated_at . "2012-10-13 12:35:37 +0900") (created_at . "2012-10-13 12:34:25 +0900") (body . "<p>新規投稿<br>
+修正</p>
+
+<p>&lt;!--<br>
+Local Variables:<br>
+qiita-file-uuid: &quot;25d36a4025c44cece36f&quot;<br>
+End:<br>
+--&gt;</p>
+") (title . "title ") (user (following . :json-false) (profile_image_url . "https://si0.twimg.com/profile_images/1681702121/icon_048_normal.png") (url_name . "uk_ar") (name . "uk")) (uuid . "25d36a4025c44cece36f") (id . 9882)) ((stocked . :json-false) (created_at_as_seconds . 1350085248) (private . :json-false) (gist_url) (url . "http://qiita.com/items/ebb63c695e194efb6da8") (comment_count . 0) (stock_users . ["katsuren"]) (stock_count . 1) (tags . [((versions . []) (following . :json-false) (follower_count . 191) (item_count . 94) (icon_url . "http://qiita.com/system/tags/icons/000/000/187/thumb/C_Sharp.png?1328867786") (url_name . "c%23") (name . "c#")) ((versions . []) (following . t) (follower_count . 1165) (item_count . 182) (icon_url . "http://qiita.com/system/tags/icons/000/000/007/thumb/emacs.jpeg?1316130821") (url_name . "Emacs") (name . "Emacs")) ((versions . []) (following . :json-false) (follower_count . 1) (item_count . 13) (icon_url . "http://qiita.com/icons/thumb/missing.png") (url_name . "api") (name . "api"))]) (updated_at_in_words . "2時間前") (created_at_in_words . "5時間前") (updated_at . "2012-10-13 12:24:59 +0900") (created_at . "2012-10-13 08:40:48 +0900") (body . "<h1>hoge</h1>
+
+<p>新規<br>
+更新<br>
+2回目の更新<br>
+3回目の更新<br>
+4回目の更新<br>
+5回目の更新<br>
+6回目の更新<br>
+ファイルからuuidの読み込み<br>
+uuidのコメントアウト<br>
+markdownのコメントアウト<br>
+OK?dayo</p>
+
+<p>&lt;!--<br>
+Local Variables:<br>
+qiita-file-uuid: &quot;ebb63c695e194efb6da8&quot;<br>
+End:<br>
+ --&gt;</p>
+") (title . "APIのテスト ") (user (following . :json-false) (profile_image_url . "https://si0.twimg.com/profile_images/1681702121/icon_048_normal.png") (url_name . "uk_ar") (name . "uk")) (uuid . "ebb63c695e194efb6da8") (id . 9877)) ((created_at_as_seconds . 1350085035) (private . t) (gist_url) (url . "http://qiita.com/private/18694bfa0a795bdc39d9") (comment_count . 0) (stock_users . []) (stock_count . 0) (tags . [((versions . ["1.3" "1.2.4"]) (following . :json-false) (follower_count . 0) (item_count . 0) (icon_url . "http://qiita.com/icons/thumb/missing.png") (url_name . "FOOBAR") (name . "FOOBAR"))]) (updated_at_in_words . "5時間前") (created_at_in_words . "5時間前") (updated_at . "2012-10-13 08:37:15 +0900") (created_at . "2012-10-13 08:37:15 +0900") (body . "<p>foooooooooooooooo</p>
+") (title . "にほんご") (user (following . :json-false) (profile_image_url . "https://si0.twimg.com/profile_images/1681702121/icon_048_normal.png") (url_name . "uk_ar") (name . "uk")) (uuid . "18694bfa0a795bdc39d9") (id . 9876)) ((stocked . :json-false) (created_at_as_seconds . 1350084207) (private . :json-false) (gist_url) (url . "http://qiita.com/items/4e57a712c71512bc4a2b") (comment_count . 0) (stock_users . ["katsuren"]) (stock_count . 1) (tags . [((versions . []) (following . :json-false) (follower_count . 191) (item_count . 94) (icon_url . "http://qiita.com/system/tags/icons/000/000/187/thumb/C_Sharp.png?1328867786") (url_name . "c%23") (name . "c#")) ((versions . []) (following . t) (follower_count . 1165) (item_count . 182) (icon_url . "http://qiita.com/system/tags/icons/000/000/007/thumb/emacs.jpeg?1316130821") (url_name . "Emacs") (name . "Emacs")) ((versions . []) (following . :json-false) (follower_count . 1) (item_count . 13) (icon_url . "http://qiita.com/icons/thumb/missing.png") (url_name . "api") (name . "api"))]) (updated_at_in_words . "6時間前") (created_at_in_words . "6時間前") (updated_at . "2012-10-13 08:23:27 +0900") (created_at . "2012-10-13 08:23:27 +0900") (body . "<h1>hoge</h1>
+") (title . "APIのテスト ") (user (following . :json-false) (profile_image_url . "https://si0.twimg.com/profile_images/1681702121/icon_048_normal.png") (url_name . "uk_ar") (name . "uk")) (uuid . "4e57a712c71512bc4a2b") (id . 9875)) ((stocked . :json-false) (created_at_as_seconds . 1349838675) (private . :json-false) (gist_url) (url . "http://qiita.com/items/1803278df7c84504c633") (comment_count . 0) (stock_users . []) (stock_count . 0) (tags . [((versions . []) (following . :json-false) (follower_count . 1) (item_count . 13) (icon_url . "http://qiita.com/icons/thumb/missing.png") (url_name . "api") (name . "api"))]) (updated_at_in_words . "14時間前") (created_at_in_words . "3日前") (updated_at . "2012-10-13 00:26:17 +0900") (created_at . "2012-10-10 12:11:15 +0900") (body . "<p>apiのテストのための投稿です。</p>
+") (title . "English") (user (following . :json-false) (profile_image_url . "https://si0.twimg.com/profile_images/1681702121/icon_048_normal.png") (url_name . "uk_ar") (name . "uk")) (uuid . "1803278df7c84504c633") (id . 9696))])
+
+;; (* 0.5 0.8)
+
+;; (message "%S" (qiita-get-items qiita-token))
 (provide 'qiita)
