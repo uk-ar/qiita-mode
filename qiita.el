@@ -238,9 +238,9 @@
                             "&")))))))
 
 (defun qiita-api-page-token-params (page token)
-  (list
-   `("page" . ,(number-to-string (or page qiita-api-page)))
-   (when token  `("token" . ,token))))
+  (append
+   `(("page" . ,(number-to-string (or page qiita-api-page))))
+   (when token `("token" . ,token))))
 
 (defun qiita-api-get-rate-limit (&optional token)
   (qiita-get-method "/rate_limit" (when token `(("token" . ,token)))))
